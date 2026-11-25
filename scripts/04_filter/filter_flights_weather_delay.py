@@ -62,6 +62,7 @@ def main() -> None:
     if missing_columns:
         raise ValueError(f"Missing delay-cause column(s): {', '.join(missing_columns)}")
 
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     partial = OUTPUT.with_name(OUTPUT.stem + ".part.parquet")
     writer = None
     kept_rows = 0
