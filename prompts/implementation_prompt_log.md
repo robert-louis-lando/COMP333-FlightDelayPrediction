@@ -890,3 +890,15 @@ subprocess.CalledProcessError: Command '['C:\\Users\\rober\\Robert Louis Lando\\
 **Validation:** Parsed the notebook JSON and checked the validation split, F1 threshold selection, full-train refit, test evaluation and clean outputs. Did not execute training.
 
 **Implementation judgment and reason:** Maximizing F1 balances precision and recall as a starting point for the user's concern about missed delayed flights. The test split remains out of threshold selection to keep evaluation independent.
+
+## 51. Balance the training split while preserving test proportions
+
+**Prompt (verbatim):**
+
+> make it so the test data keeps the same proportion, but the training is 50/50 delay no delay
+
+**What the LLM produced:** Added random undersampling after the stratified train/test split to make `X_train` and `y_train` 50/50 delayed and non-delayed. Left `X_test` and `y_test` unchanged, so test proportions remain the original stratified proportions. Updated the README and cleared notebook outputs.
+
+**Validation:** Parsed notebook JSON and checked undersampling occurs after the split, uses equal sample counts with a fixed random seed, and does not modify the test data. Did not run model training.
+
+**Implementation judgment and reason:** Used undersampling to make training 50/50 without synthesizing or duplicating examples. This discards some non-delayed training rows but preserves the full, naturally distributed test split for evaluation.

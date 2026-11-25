@@ -298,7 +298,7 @@ python scripts/11_integrate/integrate_flight_weather.py --force
 Open `notebooks/flight_delay_classification.ipynb` from JupyterLab or VS Code.
 It trains a scikit-learn multilayer perceptron using every column from the
 stage 11 integrated Parquet as a predictor except `DepDel15`, the target, and
-uses a random stratified 80/20 train/test split. The notebook selects a cutoff
+uses a random stratified 80/20 train/test split. It undersamples only the training split to 50/50; the test split keeps the original class proportions. The notebook selects a cutoff
 by maximizing F1 on a validation subset from the training data, then evaluates
 on the untouched test split. Rows without a usable target are excluded from
 supervised training.
