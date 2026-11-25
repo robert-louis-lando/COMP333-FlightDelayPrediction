@@ -119,9 +119,11 @@ python scripts/05_reduce/reduce_flight_columns.py
 ```
 
 This writes `data/staging/04_reduced/flights_2024_reduced.parquet` with only the
-nine requested flight columns. It processes batches, preserves the filtered
-row count, and leaves the filtered source file unchanged. Use `--force` to
-rebuild the output, or `--batch-size 25000` to use smaller read batches.
+previously requested flight columns plus `DepTime`, which stage 11 needs to
+match weather to the actual departure hour. It processes batches, preserves
+the filtered row count, and leaves the filtered source file unchanged. Use
+`--force` to rebuild the output, or `--batch-size 25000` to use smaller read
+batches.
 
 ## 6. Keep airport records active in 2024
 
@@ -146,9 +148,11 @@ python scripts/05_reduce/reduce_airport_columns.py
 ```
 
 This writes `data/staging/04_reduced/airports_active_2024_reduced.parquet` with
-only the six requested airport columns. It processes batches, preserves the
-filtered row count, and leaves the filtered source unchanged. Use `--force` to
-rebuild the output, or `--batch-size 25000` to use smaller read batches.
+the six requested airport columns plus `AIRPORT_COUNTRY_NAME` and
+`UTC_LOCAL_TIME_VARIATION`, which stage 11 uses to align UTC weather times to
+local departure times. It processes batches, preserves the filtered row
+count, and leaves the filtered source unchanged. Use `--force` to rebuild the
+output, or `--batch-size 25000` to use smaller read batches.
 
 Reduce the NOAA station inventory with:
 
@@ -254,12 +258,47 @@ combined weather Parquet. It writes
 the combined source unchanged. Use `--force` to rebuild the output or
 `--batch-size 25000` for smaller batches.
 
+## 11. Integrate flights with airports and weather
+
+Run:
+
+```powershell
+python scripts/11_integrate/integrate_flight_weather.py
+```
+
+This uses the latest top-ten flight and airport Parquets, ranked airport
+weather-station links, reduced station inventory, and reduced observations.
+It matches `DepTime` to the same local date and hour as the station
+observation. NOAA observation timestamps are UTC, while BTS `DepTime` is local
+HHMM, so the join applies the airport's UTC offset and 2024 U.S. daylight
+saving time where applicable. BTS defines `DepTime` as local HHMM in its
+[TranStats field definitions](https://www.transtats.bts.gov/Fields.asp?gnoyr_VQ=FGK),
+and NOAA documents GHCNh timestamps as UTC in its
+[GHCNh documentation](https://www.ncei.noaa.gov/oa/global-historical-climatology-network/hourly/doc/ghcnh_DOCUMENTATION.pdf).
+If there are multiple reports in an hour, it keeps the last report for that
+station-hour. The flight-to-weather join is a left join: all flights are kept,
+and weather observation fields are null when no same-hour report is available.
+The output row count is validated against the input flight count. It writes
+`data/staging/08_integrated/flights_airports_weather_2024.parquet`.
+Use `--force` to rebuild it or `--batch-size 2500` to use smaller flight
+batches.
+
+After adding `DepTime` and airport offsets, refresh the affected intermediate
+Parquets before running stage 11:
+
+```powershell
+python scripts/05_reduce/reduce_flight_columns.py --force
+python scripts/05_reduce/reduce_airport_columns.py --force
+python scripts/07_subset/keep_top10_origin_airports.py --force
+python scripts/11_integrate/integrate_flight_weather.py --force
+```
+
 ## Pipeline folder layout
 
 Scripts are grouped by stage under `scripts/01_download/` through
-`scripts/10_reduce/`. Parquet outputs are grouped by stage under
+`scripts/11_integrate/`. Parquet outputs are grouped by stage under
 `data/staging/01_converted/`, `02_combined/`, `03_filtered/`, `04_reduced/`,
-`05_top10/`, `06_analysis/`, and `07_weather/`. Source data remains under
+`05_top10/`, `06_analysis/`, `07_weather/`, and `08_integrated/`. Source data remains under
 `data/raw/bts/` and `data/raw/noaa/`.
 The earlier WeatherDelay-filter output is preserved in
 `data/archive/previous_outputs/`; it is not an input to the current pipeline.

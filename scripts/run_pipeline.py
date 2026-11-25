@@ -24,6 +24,7 @@ STEPS = (
     ("Download observations for nearest weather stations", "scripts/08_download/download_weather_observations.py", True),
     ("Convert and combine weather observations", "scripts/09_combine/combine_weather_observations.py", True),
     ("Reduce weather observation columns", "scripts/10_reduce/reduce_weather_observation_columns.py", True),
+    ("Integrate flights, airports, stations, and weather", "scripts/11_integrate/integrate_flight_weather.py", True),
 )
 
 

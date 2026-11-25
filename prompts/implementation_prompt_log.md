@@ -752,3 +752,75 @@ subprocess.CalledProcessError: Command '['C:\\Users\\rober\\Robert Louis Lando\\
 **Validation:** Reviewed the input/output paths, selected column names and order, batch writing, and output schema/row-count checks. The reducer was not run.
 
 **Implementation judgment and reason:** Streamed the selected columns from the combined Parquet into a separate reduced output, preserving source values and the original combined file for future cleaning.
+
+## 42. Integrate flights, airports, station links, stations, and observations
+
+**Prompt (verbatim):**
+
+> make a script for stage 11 in the pipeline which will join the parquets of flights, airports, AirportWeatherStation linking table, the 10 weather stations and the weather observations, you need to join on the lastest/last produced parquet for each
+
+**What the LLM produced:** Added `scripts/11_integrate/integrate_flight_weather.py` to join the latest top-ten flights and airports, ranked airport-station links, reduced station inventory, and reduced observations into `data/staging/08_integrated/flights_airports_weather_2024.parquet`. Added it to the pipeline and documented its inputs and output.
+
+**Validation:** Reviewed input paths and schemas, candidate station selection, airport/station join keys, date matching, batch writes, and output schema/row-count validation. The integration was not run.
+
+**Implementation judgment and reason:** Selected the highest-priority linked station present in the observation Parquet for each airport. Since the reduced flight data has no departure time, joined all matching station observations by calendar date and preserved the resulting one-to-many rows instead of inventing an hourly match or aggregate.
+
+## 43. Match weather observations to the flight departure hour
+
+**Prompt (verbatim):**
+
+> can u refactor the stage 11 so that when a flight is joined with an airport and then a weather station, the joining between these and the weather observations are only kept if the weather observation is the same hour as the flight departure so we should have around 1.9 millions rows
+
+**What the LLM produced:** Updated stage 11 to keep only flights with a weather observation at the same local departure date and hour. It keeps one last report per airport/station/local hour, adds `WeatherObservationLocalDateTime`, and drops flights with no matching observation. Added `DepTime` to reduced flight columns and the airport country/UTC offset to reduced and top-ten airport Parquets so the join can align local departures with UTC observations.
+
+**Validation:** Reviewed the new input columns, local-time key creation, offset and 2024 U.S. daylight-saving conversion, per-hour deduplication, inner-join behavior, and README refresh commands. The integration was not run.
+
+**Implementation judgment and reason:** NOAA GHCNh timestamps are UTC and BTS `DepTime` is local HHMM, so compare them after converting the observation to airport local time. Kept the last report in each hour to avoid duplicate flight rows and retain the closing report where hourly precipitation totals are involved. Flights without a same-hour report are excluded as requested.
+
+## 44. Fix pandas boolean-to-timedelta error in stage 11
+
+**Prompt (verbatim):**
+
+```text
+Traceback (most recent call last):
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\11_integrate\integrate_flight_weather.py", line 390, in <module>
+    main()
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\11_integrate\integrate_flight_weather.py", line 325, in main
+    flight_date = flight_date + pd.to_timedelta(departure_hhmm.eq(2400).fillna(False), unit="D")
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\.venv\Lib\site-packages\pandas\core\tools\timedeltas.py", line 185, in to_timedelta
+    values = _convert_listlike(arg._values, unit=unit, errors=errors)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\.venv\Lib\site-packages\pandas\core\tools\timedeltas.py", line 240, in _convert_listlike
+    td64arr = sequence_to_td64ns(arg, unit=unit, errors=errors, copy=False)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\.venv\Lib\site-packages\pandas\core\arrays\timedeltas.py", line 1361, in sequence_to_td64ns
+    raise TypeError(f"dtype {data.dtype} cannot be converted to timedelta64[ns]")
+TypeError: dtype bool cannot be converted to timedelta64[ns]
+Traceback (most recent call last):
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\run_pipeline.py", line 55, in <module>
+    main()
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\run_pipeline.py", line 49, in main
+    subprocess.run(command, cwd=ROOT, check=True)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['C:\\Users\\rober\\Robert Louis Lando\\Concordia\\Courses\\COMP 333\\Project LLM\\COMP333-FlightDelayPrediction\\.venv\\Scripts\\python.exe', 'C:\\Users\\rober\\Robert Louis Lando\\Concordia\\Courses\\COMP 333\\Project LLM\\COMP333-FlightDelayPrediction\\scripts\\11_integrate\\integrate_flight_weather.py', '--force']' returned non-zero exit status 1.
+```
+
+**What the LLM produced:** Converted the `DepTime == 2400` rollover boolean to an `int8` day count before passing it to `pd.to_timedelta`.
+
+**Validation:** Reviewed the affected conversion and confirmed the boolean-to-integer-to-timedelta sequence. The integration was not rerun.
+
+**Implementation judgment and reason:** The boolean identifies rows whose `2400` departure time rolls over to the next date; pandas requires numeric day counts for this timedelta operation.
+
+## 45. Keep flights without same-hour weather matches
+
+**Prompt (verbatim):**
+
+> don't drop these just do a left join with flight so if there is no observation it should just keep those columns null
+
+**What the LLM produced:** Changed the flight-to-weather join in stage 11 to a left join and stopped filtering out flights with missing or invalid departure join keys. Weather observation fields remain null when there is no same-hour match. Added a check that integrated row count equals the flight input row count and updated the README.
+
+**Validation:** Reviewed the left-join key paths and output row-count check. The integration was not rerun.
+
+**Implementation judgment and reason:** Preserve all flight rows as requested while retaining null weather values when the selected station has no observation for that flight's local departure hour.
