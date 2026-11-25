@@ -26,13 +26,26 @@ From the project root, run:
 python scripts/01_download/download_datasets.py
 ```
 
-The script downloads the BTS Master Coordinate airport ZIP and 12 monthly
-flight ZIPs for January through December 2024. It saves them under
-`data/raw/bts/airports/` and `data/raw/bts/flights/`. Existing downloads are
-kept; use `python scripts/01_download/download_datasets.py --force` to download them again.
-The ZIPs are verified and left intact.
+The script downloads the BTS Master Coordinate airport ZIP, 12 monthly flight
+ZIPs for January through December 2024, and the NOAA GHCN hourly station-list
+CSV/TXT files. BTS files are saved under `data/raw/bts/`; the station inventory
+is saved under `data/raw/noaa/stations/`. Existing downloads are kept; use
+`python scripts/01_download/download_datasets.py --force` to download them
+again. BTS ZIPs are verified and left intact.
 
-## 2. Convert the ZIPs to Parquet
+To download only one dataset, use one of these mutually exclusive options:
+
+```powershell
+python scripts/01_download/download_datasets.py --flights-only
+python scripts/01_download/download_datasets.py --airports-only
+python scripts/01_download/download_datasets.py --stations-only
+```
+
+With no dataset option, the downloader gets all three. The pipeline runner
+uses this default. Add `--force` with any option to download that selection
+again.
+
+## 2. Convert the datasets to Parquet
 
 Install the conversion dependencies once:
 
@@ -46,11 +59,23 @@ Then run:
 python scripts/02_convert/convert_to_parquet.py
 ```
 
-The script reads each CSV directly inside its ZIP in chunks; it does not extract
-the CSVs. It writes one Parquet file per flight month and one for airports under
-`data/staging/01_converted/`. Flight columns are initially stored as text to preserve
-the source values. Blank CSV headers are given a generated name. Existing
-Parquet files are kept; use `--force` to rebuild them.
+The script reads CSVs in chunks. It reads flight and airport CSVs directly
+inside their ZIPs without extracting them, and converts the NOAA station-list
+CSV. It writes one Parquet file per flight month, one for airports, and
+`ghcnh_stations.parquet` under `data/staging/01_converted/`. Values are
+initially stored as text to preserve source values; blank CSV headers are given
+a generated name. Existing Parquet files are kept; use `--force` to rebuild.
+
+To convert just one dataset, use one of these mutually exclusive options:
+
+```powershell
+python scripts/02_convert/convert_to_parquet.py --flights-only
+python scripts/02_convert/convert_to_parquet.py --airports-only
+python scripts/02_convert/convert_to_parquet.py --stations-only
+```
+
+With no dataset option, the converter handles all three. The pipeline runner
+uses this default.
 
 ## 3. Combine the flight months
 
@@ -123,6 +148,17 @@ only the six requested airport columns. It processes batches, preserves the
 filtered row count, and leaves the filtered source unchanged. Use `--force` to
 rebuild the output, or `--batch-size 25000` to use smaller read batches.
 
+Reduce the NOAA station inventory with:
+
+```powershell
+python scripts/05_reduce/reduce_station_columns.py
+```
+
+This reads `data/staging/01_converted/ghcnh_stations.parquet` directly and
+writes `data/staging/04_reduced/ghcnh_stations_reduced.parquet` with only
+`GHCN_ID`, `LATITUDE`, and `LONGITUDE`. The inventory is not combined or
+filtered. Use `--force` to rebuild the output.
+
 ## 8. Count flights by origin airport
 
 After reducing both datasets, run:
@@ -155,7 +191,8 @@ Use `--force` to rebuild both outputs.
 Scripts are grouped in run order under `scripts/01_download/` through
 `scripts/07_subset/`. Parquet outputs are grouped by stage under
 `data/staging/01_converted/`, `02_combined/`, `03_filtered/`, `04_reduced/`,
-and `05_top10/`. The original ZIP downloads remain under `data/raw/bts/`.
+and `05_top10/`. Source data remains under `data/raw/bts/` and
+`data/raw/noaa/stations/`.
 The earlier WeatherDelay-filter output is preserved in
 `data/archive/previous_outputs/`; it is not an input to the current pipeline.
 

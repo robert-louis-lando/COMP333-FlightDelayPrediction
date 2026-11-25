@@ -537,3 +537,115 @@ folder layout. The runner was not executed.
 use the same Python environment as the runner, and `subprocess.run(check=True)`
 so the pipeline stops immediately if a step fails. Added `--force` to rebuild
 the complete chain when requested.
+
+## 29. Add NOAA weather-station inventory downloads
+
+**Prompt (verbatim):**
+
+> now can you add a script (add it to the download one) that will download the weather stations (refer to the old repo for the endpoint)
+
+**What the LLM produced:** Extended
+`scripts/01_download/download_datasets.py` to download the NOAA GHCN hourly
+station inventory CSV and TXT companion under `data/raw/noaa/stations/`.
+Updated the README and pipeline runner label.
+
+**Validation:** Confirmed the `doc/` station-list endpoint against the old
+repository's download definitions. Reviewed the download, non-empty/length,
+and CSV-header checks. The download was not run.
+
+**Implementation judgment and reason:** Included the station inventory CSV and
+its TXT companion because both are the old repo's station-list files. Did not
+add NOAA observations or documentation PDFs; the request was for station
+inventory downloads.
+
+## 30. Add individual dataset download options
+
+**Prompt (verbatim):**
+
+> can u add a flag to just download the each the other dataset individually while the pipeline would do them all
+
+**What the LLM produced:** Added mutually exclusive `--flights-only`,
+`--airports-only`, and `--stations-only` flags to
+`scripts/01_download/download_datasets.py`. With no dataset flag it still
+downloads all three selections, as used by the pipeline runner. Updated the
+README with examples.
+
+**Validation:** Reviewed argument exclusivity, selection conditions, and the
+runner's no-argument downloader call. The downloader was not run.
+
+**Implementation judgment and reason:** Used explicit `*-only` flags to avoid
+ambiguity and kept the default as all datasets so the full pipeline remains
+one-command.
+
+## 31. Add dataset selection to Parquet conversion
+
+**Prompt (verbatim):**
+
+> do a similar thing for the convert step: add flags and convert to parquet for weather stations
+
+**What the LLM produced:** Added mutually exclusive `--flights-only`,
+`--airports-only`, and `--stations-only` flags to
+`scripts/02_convert/convert_to_parquet.py`. The converter now writes
+`data/staging/01_converted/ghcnh_stations.parquet` from the downloaded NOAA
+station CSV. With no selection flag it converts all datasets. Updated the
+README and pipeline runner label.
+
+**Validation:** Reviewed the selection branches, station source/output paths,
+and no-flag pipeline call. The converter was not run.
+
+**Implementation judgment and reason:** Reused the chunked CSV-to-Parquet
+conversion path for both ZIP members and the plain station CSV, keeping values
+as text and avoiding an extracted intermediate file.
+
+## 32. Clarify that station CSV and TXT do not need combining
+
+**Prompt (verbatim):**
+
+> nvm I thought the csv and the txt were 2 files but its just one weather station file no need to combine
+
+**What the LLM produced:** Confirmed that the CSV contains the station
+inventory and the TXT is its companion reference file; no combine script was
+added.
+
+**Validation:** Checked the current download/conversion setup, where only the
+CSV is converted to `ghcnh_stations.parquet` and the TXT remains a raw companion
+file.
+
+**Implementation judgment and reason:** Kept the two source files distinct
+because the TXT is not a second tabular Parquet dataset.
+
+## 33. Preview the weather-station CSV
+
+**Prompt (verbatim):**
+
+> can u add a preview for the weather station .csv
+
+**What the LLM produced:** Created
+`data/preview/weather_stations_first_50.csv` with the first 50 station records
+and all 11 columns from `data/raw/noaa/stations/ghcnh-station-list.csv`.
+
+**Validation:** The extraction command reported 50 rows, 11 columns, and a
+2,838-byte preview file.
+
+**Implementation judgment and reason:** Used Python's standard CSV reader to
+create a small inspection file while leaving the downloaded station inventory
+unchanged.
+
+## 34. Reduce the station inventory to ID and coordinates
+
+**Prompt (verbatim):**
+
+> we don't need a combine nor a filter script, but make a reduce script which keep only these columns: GHCN_ID\tLATITUDE\tLONGITUDE
+
+**What the LLM produced:** Added
+`scripts/05_reduce/reduce_station_columns.py` to select `GHCN_ID`, `LATITUDE`,
+and `LONGITUDE` from the converted station inventory and write
+`data/staging/04_reduced/ghcnh_stations_reduced.parquet`. Added the reducer to
+the pipeline runner and README.
+
+**Validation:** Reviewed the input path, requested column names/order, and
+batch-written output schema and row-count checks. The script was not run.
+
+**Implementation judgment and reason:** Read the station inventory Parquet
+directly, without inserting a combine/filter step, and wrote a separate output
+so the full inventory remains available.
