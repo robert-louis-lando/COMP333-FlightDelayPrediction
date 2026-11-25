@@ -685,3 +685,70 @@ so the full inventory remains available.
 **Validation:** Reviewed the candidate ranking and row-count logic, priority ordering, 404-only fallback, cached station results, and documentation. Downloads were not run.
 
 **Implementation judgment and reason:** A station may be nearest to multiple airports, so the downloader shares one successfully fetched local station file among them. Each airport uses its first available candidate; a non-404 download failure stops the script instead of silently selecting a more distant station.
+
+## 38. Fall back to a validated airport ZIP during BTS maintenance
+
+**Prompt (verbatim):**
+
+```text
+Downloading the complete BTS Master Coordinate airport ZIP.
+Traceback (most recent call last):
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\01_download\download_datasets.py", line 171, in <module>
+    main()
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\01_download\download_datasets.py", line 160, in main
+    download_zip(client, airport_download_request(client), airport_path, args.force)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\01_download\download_datasets.py", line 123, in airport_download_request
+    raise RuntimeError("Could not read the expected BTS airport download form")
+RuntimeError: Could not read the expected BTS airport download form
+Traceback (most recent call last):
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\run_pipeline.py", line 52, in <module>
+    main()
+  File "C:\Users\rober\Robert Louis Lando\Concordia\Courses\COMP 333\Project LLM\COMP333-FlightDelayPrediction\scripts\run_pipeline.py", line 46, in main
+    subprocess.run(command, cwd=ROOT, check=True)
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['C:\\Users\\rober\\Robert Louis Lando\\Concordia\\Courses\\COMP 333\\Project LLM\\COMP333-FlightDelayPrediction\\.venv\\Scripts\\python.exe', 'C:\\Users\\rober\\Robert Louis Lando\\Concordia\\Courses\\COMP 333\\Project LLM\\COMP333-FlightDelayPrediction\\scripts\\01_download\\download_datasets.py', '--force']' returned non-zero exit status 1.
+```
+
+**What the LLM produced:** Updated `scripts/01_download/download_datasets.py` to recognize the BTS maintenance page and reuse an existing airport ZIP only after verifying ZIP integrity and the expected CSV member. Documented the fallback in README.
+
+**Validation:** Confirmed the endpoint returned a maintenance page and the existing local airport ZIP had no ZIP integrity errors and contained `T_MASTER_CORD.csv`. Could not rerun the downloader in this environment because starting the Python script returned Access is denied.
+
+**Implementation judgment and reason:** Keep the pipeline usable with the already downloaded valid airport source during a BTS outage; if no valid cached ZIP exists, stop with a clear error instead of substituting unknown airport data.
+
+## 39. Convert and combine weather observations
+
+**Prompt (verbatim):**
+
+> lets add 09 step to the pipeline that converts and combines the weather observation into a single parquet file
+
+**What the LLM produced:** Added `scripts/09_combine/combine_weather_observations.py` to convert the downloaded 2024 station PSV files and append their rows into `data/staging/07_weather/weather_observations_2024.parquet`. Added this as the next step in the pipeline and documented its command and output.
+
+**Validation:** Reviewed source file selection, PSV parsing, matching headers, string-preserving schema, batch writes, and output row/schema checks. The conversion was not run.
+
+**Implementation judgment and reason:** Kept observation source values as text and streamed each station file in chunks to avoid loading the combined dataset into memory. The source PSV files remain available for later cleaning.
+
+## 40. Preview 50 weather-observation rows
+
+**Prompt (verbatim):**
+
+> can u make me a preview for the weather obseration similar to the others only the 50 rows sample
+
+**What the LLM produced:** Created `data/preview/weather_observations_first_50.csv` with 50 observation rows and all 329 columns, using the first downloaded station file. Documented the preview in README.
+
+**Validation:** The preview generation reported 50 data rows, 329 columns, and 55,785 bytes.
+
+**Implementation judgment and reason:** Used the first sorted station file, `GHCNh_USW00003017_2024.psv`, matching the other source-data previews' first-rows approach and preserving the full observation schema.
+
+## 41. Reduce weather observation columns
+
+**Prompt (verbatim):**
+
+> add stage 10 which will reduce the columns of the weather observation parquet. Drop all other columsn except: STATION, DATE, temperature, wind_speed,visibility, dew_point_temperature, station_level_pressure, wind_gust, precipitation, wet_bulb_temperature, relative_humidity.
+
+**What the LLM produced:** Added `scripts/10_reduce/reduce_weather_observation_columns.py` to write `data/staging/07_weather/weather_observations_2024_reduced.parquet` with only the 11 requested columns. Added the reducer as the final pipeline step and documented its command and output in README.
+
+**Validation:** Reviewed the input/output paths, selected column names and order, batch writing, and output schema/row-count checks. The reducer was not run.
+
+**Implementation judgment and reason:** Streamed the selected columns from the combined Parquet into a separate reduced output, preserving source values and the original combined file for future cleaning.

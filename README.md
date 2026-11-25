@@ -31,7 +31,9 @@ ZIPs for January through December 2024, and the NOAA GHCN hourly station-list
 CSV/TXT files. BTS files are saved under `data/raw/bts/`; the station inventory
 is saved under `data/raw/noaa/stations/`. Existing downloads are kept; use
 `python scripts/01_download/download_datasets.py --force` to download them
-again. BTS ZIPs are verified and left intact.
+again. BTS ZIPs are verified and left intact. If TranStats is unavailable
+during a forced airport refresh, the downloader reuses the existing airport
+ZIP only if it passes ZIP integrity validation and contains `T_MASTER_CORD.csv`.
 
 To download only one dataset, use one of these mutually exclusive options:
 
@@ -202,7 +204,7 @@ the three nearest station candidates for each airport (30 rows) to
 distance in `DISTANCE_RANK`. Use
 `--force` to rebuild both outputs or `--batch-size 25000` for smaller batches.
 
-## 11. Download observations for the closest weather stations
+## 08. Download observations for the closest weather stations
 
 Run:
 
@@ -218,13 +220,47 @@ Files are saved to `data/raw/noaa/observations/`. Existing files are reused;
 add `--force` to download them again. The pipeline runs this after creating the
 ranked candidate table.
 
+## 09. Convert and combine weather observations
+
+Run:
+
+```powershell
+python scripts/09_combine/combine_weather_observations.py
+```
+
+This reads every downloaded 2024 GHCNh PSV file, checks that their columns
+match, and appends the rows into
+`data/staging/07_weather/weather_observations_2024.parquet`. Source values are
+kept as text and the original PSV files are left unchanged. Use `--force` to
+rebuild the Parquet or `--batch-size 25000` for smaller read batches. The full
+pipeline runs this after the step 08 observation download.
+
+The first 50 rows from the first station file are also available as
+`data/preview/weather_observations_first_50.csv` for inspection.
+
+## 10. Reduce weather observation columns
+
+Run:
+
+```powershell
+python scripts/10_reduce/reduce_weather_observation_columns.py
+```
+
+This keeps `STATION`, `DATE`, `temperature`, `wind_speed`, `visibility`,
+`dew_point_temperature`, `station_level_pressure`, `wind_gust`,
+`precipitation`, `wet_bulb_temperature`, and `relative_humidity` from the
+combined weather Parquet. It writes
+`data/staging/07_weather/weather_observations_2024_reduced.parquet` and leaves
+the combined source unchanged. Use `--force` to rebuild the output or
+`--batch-size 25000` for smaller batches.
+
 ## Pipeline folder layout
 
 Scripts are grouped by stage under `scripts/01_download/` through
-`scripts/08_download/`. Parquet outputs are grouped by stage under
+`scripts/10_reduce/`. Parquet outputs are grouped by stage under
 `data/staging/01_converted/`, `02_combined/`, `03_filtered/`, `04_reduced/`,
-`05_top10/`, and `06_analysis/`. Source data remains under `data/raw/bts/` and
-`data/raw/noaa/stations/`.
+`05_top10/`, `06_analysis/`, and `07_weather/`. Source data remains under
+`data/raw/bts/` and `data/raw/noaa/`.
 The earlier WeatherDelay-filter output is preserved in
 `data/archive/previous_outputs/`; it is not an input to the current pipeline.
 

@@ -112,6 +112,9 @@ def airport_download_request(client: urllib.request.OpenerDirector) -> urllib.re
     with client.open(AIRPORT_FORM, timeout=120) as response:
         page = response.read().decode("utf-8")
 
+    if "system maintenance" in page.lower() or "maintenance.aspx?reason=db" in page.lower():
+        raise RuntimeError("BTS TranStats is currently serving its system-maintenance page")
+
     hidden = {
         name: html.unescape(value)
         for name, value in re.findall(
@@ -157,7 +160,27 @@ def main() -> None:
         if airport_path.is_file() and not args.force:
             print(f"Already downloaded: {airport_path.relative_to(ROOT)}")
         else:
-            download_zip(client, airport_download_request(client), airport_path, args.force)
+            try:
+                request = airport_download_request(client)
+            except RuntimeError as exc:
+                try:
+                    with zipfile.ZipFile(airport_path) as archive:
+                        valid_archive = (
+                            "T_MASTER_CORD.csv" in archive.namelist()
+                            and archive.testzip() is None
+                        )
+                except (OSError, zipfile.BadZipFile):
+                    valid_archive = False
+                if not valid_archive:
+                    raise RuntimeError(
+                        f"{exc}. No valid cached airport ZIP is available; retry when BTS is back."
+                    ) from exc
+                print(
+                    f"BTS airport download unavailable ({exc}); using validated cached "
+                    f"{airport_path.relative_to(ROOT)} instead."
+                )
+            else:
+                download_zip(client, request, airport_path, args.force)
 
     if download_all or args.stations_only:
         print("Downloading the NOAA GHCN hourly weather-station inventory.")
