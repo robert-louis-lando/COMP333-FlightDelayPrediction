@@ -8,9 +8,9 @@ import os
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-INPUT = ROOT / "data/staging/parquet/airports.parquet"
-OUTPUT = ROOT / "data/staging/parquet/airports_active_2024.parquet"
+ROOT = Path(__file__).resolve().parents[2]
+INPUT = ROOT / "data/staging/01_converted/airports.parquet"
+OUTPUT = ROOT / "data/staging/03_filtered/airports_active_2024.parquet"
 ACTIVE_FROM = date(2024, 1, 1)
 ACTIVE_THROUGH = date(2024, 12, 31)
 DATE_FORMATS = (
@@ -67,7 +67,7 @@ def main() -> None:
         import pyarrow.parquet as pq
     except ImportError as exc:
         raise SystemExit(
-            "Airport filtering needs pyarrow. Install it with: py -m pip install pyarrow"
+            "Airport filtering needs pyarrow. Install it with: python -m pip install pyarrow"
         ) from exc
 
     if OUTPUT.is_file() and not args.force:
@@ -76,7 +76,7 @@ def main() -> None:
     if not INPUT.is_file():
         raise FileNotFoundError(
             f"Missing airport Parquet: {INPUT.relative_to(ROOT)}. "
-            "Run scripts/convert_to_parquet.py first."
+            "Run scripts/02_convert/convert_to_parquet.py first."
         )
 
     source = pq.ParquetFile(INPUT)

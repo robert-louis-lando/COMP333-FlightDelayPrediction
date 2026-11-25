@@ -14,7 +14,7 @@ import urllib.request
 import zipfile
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 AIRPORT_FORM = (
     "https://www.transtats.bts.gov/DL_SelectFields.aspx?"
     "QO_fu146_anzr=N8vn6v10+f722146+gnoyr5&gnoyr_VQ=FLL"

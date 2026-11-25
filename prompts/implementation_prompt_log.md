@@ -458,3 +458,82 @@ The script was not run.
 **Implementation judgment and reason:** Kept this as a separate output so the
 date-filtered airport source remains available, streamed batches to limit
 memory, and preserved all rows because this step reduces columns only.
+
+## 25. Join origin flights to airports and print the top ten
+
+**Prompt (verbatim):**
+
+> write a script which will join flights to airport based on the airportseqid only for the origin of the flight and print me the 10 airports with the most fligths give me flight count
+
+**What the LLM produced:** Added `scripts/top_origin_airports.py`. It counts
+origin sequence IDs from the reduced flight Parquet in batches, matches those
+counts to the reduced airport Parquet by sequence ID, and prints the ten
+highest airport counts. Updated the README with the run command.
+
+**Validation:** Reviewed input paths, join-key mapping, counting loop, and
+handling/reporting of unmatched IDs. The script was not run.
+
+**Implementation judgment and reason:** Aggregated IDs in batches rather than
+materializing the full flight dataset, loaded only the airport name/city/state
+fields needed for output, and made tie ordering deterministic.
+
+## 26. Keep only the top ten origin airports and their flights
+
+**Prompt (verbatim):**
+
+> ok now make a follow up script that drops all airports and flights that aren't in these top 10 airport and their flights
+
+**What the LLM produced:** Added `scripts/keep_top10_origin_airports.py`. It
+recomputes the top ten from the reduced inputs, writes a flight Parquet for
+departures from those airport sequence IDs, and writes a second Parquet with
+only the matching airport records. Updated the README.
+
+**Validation:** Reviewed that both outputs use the same top-ten sequence IDs,
+that flight rows are filtered by origin only, and that output row counts are
+checked. The script was not run.
+
+**Implementation judgment and reason:** Interpreted “their flights” as flights
+originating at the top ten origin airports because the preceding ranking was
+specifically based on origin counts. Left destination IDs unrestricted and
+documented this so the output remains a departure cohort rather than only
+routes between the top-ten airports.
+
+## 27. Reorganize scripts and Parquets by pipeline order
+
+**Prompt (verbatim):**
+
+> can u restructured the script structure as well as the parquets based on the order of which they need to be run in the "pipeline"
+
+**What the LLM produced:** Grouped scripts under numbered stage folders from
+`scripts/01_download/` through `scripts/07_subset/`. Moved Parquets into stage
+folders under `data/staging/01_converted/` through `05_top10/`, updated script
+paths and README commands, and archived the previous WeatherDelay-filter
+output under `data/archive/previous_outputs/`.
+
+**Validation:** Verified the destination folders and individual file moves,
+reviewed script root/path references, and searched the scripts and README for
+old flat script paths and `data/staging/parquet` references. No scripts were
+run.
+
+**Implementation judgment and reason:** Grouped related operations by
+dependency stage, kept the airport and flight branches together at filtering
+and reduction stages, and preserved the obsolete result in an archive rather
+than deleting it.
+
+## 28. Add a runner for the complete pipeline
+
+**Prompt (verbatim):**
+
+> can u add a way for me to run the whole pipeline sequencially?
+
+**What the LLM produced:** Added `scripts/run_pipeline.py` to execute the nine
+pipeline scripts in dependency order, and documented the setup and command in
+the README.
+
+**Validation:** Reviewed the step order and script paths against the README and
+folder layout. The runner was not executed.
+
+**Implementation judgment and reason:** Used `sys.executable` so child scripts
+use the same Python environment as the runner, and `subprocess.run(check=True)`
+so the pipeline stops immediately if a step fails. Added `--force` to rebuild
+the complete chain when requested.

@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-INPUT = ROOT / "data/staging/parquet/airports_active_2024.parquet"
-OUTPUT = ROOT / "data/staging/parquet/airports_active_2024_reduced.parquet"
+ROOT = Path(__file__).resolve().parents[2]
+INPUT = ROOT / "data/staging/03_filtered/airports_active_2024.parquet"
+OUTPUT = ROOT / "data/staging/04_reduced/airports_active_2024_reduced.parquet"
 COLUMNS = (
     "AIRPORT_SEQ_ID",
     "AIRPORT_STATE_NAME",
@@ -33,7 +33,7 @@ def main() -> None:
         import pyarrow.parquet as pq
     except ImportError as exc:
         raise SystemExit(
-            "Column reduction needs pyarrow. Install it with: py -m pip install pyarrow"
+            "Column reduction needs pyarrow. Install it with: python -m pip install pyarrow"
         ) from exc
 
     if OUTPUT.is_file() and not args.force:
@@ -42,7 +42,7 @@ def main() -> None:
     if not INPUT.is_file():
         raise FileNotFoundError(
             f"Missing 2024-active airport Parquet: {INPUT.relative_to(ROOT)}. "
-            "Run scripts/filter_airports_active_2024.py first."
+            "Run scripts/04_filter/filter_airports_active_2024.py first."
         )
 
     source = pq.ParquetFile(INPUT)

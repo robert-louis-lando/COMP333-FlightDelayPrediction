@@ -10,7 +10,7 @@ from pathlib import Path
 import zipfile
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FLIGHT_FILE = "On_Time_Marketing_Carrier_On_Time_Performance_Beginning_January_2018_2024_{}.zip"
 CHUNK_SIZE = 50_000
 
@@ -61,7 +61,7 @@ def convert_zip(zip_path: Path, parquet_path: Path, force: bool) -> None:
     except ImportError as exc:
         raise SystemExit(
             "Parquet conversion needs pandas and pyarrow. Install them with: "
-            "py -m pip install pandas pyarrow"
+            "python -m pip install pandas pyarrow"
         ) from exc
 
     parquet_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +106,7 @@ def main() -> None:
     parser.add_argument("--force", action="store_true", help="rebuild existing Parquet files")
     args = parser.parse_args()
 
-    output_dir = ROOT / "data/staging/parquet"
+    output_dir = ROOT / "data/staging/01_converted"
     print("Converting flight ZIPs one month at a time.")
     for month in range(1, 13):
         month_text = f"{month:02d}"

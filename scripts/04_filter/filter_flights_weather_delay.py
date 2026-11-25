@@ -7,9 +7,9 @@ import os
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-INPUT = ROOT / "data/staging/parquet/flights_2024_all.parquet"
-OUTPUT = ROOT / "data/staging/parquet/flights_2024_weather_delay_rule.parquet"
+ROOT = Path(__file__).resolve().parents[2]
+INPUT = ROOT / "data/staging/02_combined/flights_2024_all.parquet"
+OUTPUT = ROOT / "data/staging/03_filtered/flights_2024_weather_delay_rule.parquet"
 DELAY_CAUSE_COLUMNS = (
     "WeatherDelay",
     "CarrierDelay",
@@ -41,7 +41,7 @@ def main() -> None:
         import pyarrow.parquet as pq
     except ImportError as exc:
         raise SystemExit(
-            "Filtering Parquet files needs pyarrow. Install it with: py -m pip install pyarrow"
+            "Filtering Parquet files needs pyarrow. Install it with: python -m pip install pyarrow"
         ) from exc
 
     if OUTPUT.is_file() and not args.force:
@@ -50,7 +50,7 @@ def main() -> None:
     if not INPUT.is_file():
         raise FileNotFoundError(
             f"Missing combined flight Parquet: {INPUT.relative_to(ROOT)}. "
-            "Run scripts/combine_flight_parquets.py first."
+            "Run scripts/03_combine/combine_flight_parquets.py first."
         )
 
     source = pq.ParquetFile(INPUT)

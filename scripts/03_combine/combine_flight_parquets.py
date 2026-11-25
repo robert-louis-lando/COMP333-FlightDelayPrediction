@@ -7,9 +7,10 @@ import os
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-PARQUET_DIR = ROOT / "data/staging/parquet"
-OUTPUT = PARQUET_DIR / "flights_2024_all.parquet"
+ROOT = Path(__file__).resolve().parents[2]
+MONTHLY_DIR = ROOT / "data/staging/01_converted"
+OUTPUT_DIR = ROOT / "data/staging/02_combined"
+OUTPUT = OUTPUT_DIR / "flights_2024_all.parquet"
 
 
 def main() -> None:
@@ -25,20 +26,20 @@ def main() -> None:
         import pyarrow.parquet as pq
     except ImportError as exc:
         raise SystemExit(
-            "Combining Parquet files needs pyarrow. Install it with: py -m pip install pyarrow"
+            "Combining Parquet files needs pyarrow. Install it with: python -m pip install pyarrow"
         ) from exc
 
     if OUTPUT.is_file() and not args.force:
         print(f"Already combined: {OUTPUT.relative_to(ROOT)} (use --force to rebuild)")
         return
 
-    inputs = [PARQUET_DIR / f"flights_2024_{month:02d}.parquet" for month in range(1, 13)]
+    inputs = [MONTHLY_DIR / f"flights_2024_{month:02d}.parquet" for month in range(1, 13)]
     missing = [path for path in inputs if not path.is_file()]
     if missing:
         paths = "\n".join(f"  - {path.relative_to(ROOT)}" for path in missing)
         raise FileNotFoundError(f"Missing monthly Parquet input(s):\n{paths}")
 
-    PARQUET_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     partial = OUTPUT.with_name(OUTPUT.stem + ".part.parquet")
     writer = None
     expected_schema = None
