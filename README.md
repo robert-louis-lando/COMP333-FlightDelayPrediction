@@ -293,6 +293,15 @@ python scripts/07_subset/keep_top10_origin_airports.py --force
 python scripts/11_integrate/integrate_flight_weather.py --force
 ```
 
+## Flight-delay classification notebook
+
+Open `notebooks/flight_delay_classification.ipynb` from JupyterLab or VS Code.
+It trains a scikit-learn multilayer perceptron using every column from the
+stage 11 integrated Parquet as a predictor except `DepDel15`, the target, and
+uses a random stratified 80/20 train/test split. The notebook selects a cutoff
+by maximizing F1 on a validation subset from the training data, then evaluates
+on the untouched test split. Rows without a usable target are excluded from
+supervised training.
 ## Pipeline folder layout
 
 Scripts are grouped by stage under `scripts/01_download/` through

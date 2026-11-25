@@ -824,3 +824,69 @@ subprocess.CalledProcessError: Command '['C:\\Users\\rober\\Robert Louis Lando\\
 **Validation:** Reviewed the left-join key paths and output row-count check. The integration was not rerun.
 
 **Implementation judgment and reason:** Preserve all flight rows as requested while retaining null weather values when the selected station has no observation for that flight's local departure hour.
+
+## 46. Add a flight-delay classification notebook
+
+**Prompt (verbatim):**
+
+> lets make a jupyter notebook that will take the parquet produced by 11_integrate and will do a classification predicition the label is the column DepDelay15
+
+**What the LLM produced:** Added `notebooks/flight_delay_classification.ipynb`. It loads the stage 11 Parquet, uses `DepDelay15` when present and falls back to the current `DepDel15` column, trains a class-balanced logistic classifier, and evaluates on Novemberâ€“December after training on Januaryâ€“October. Added notebook instructions to README.
+
+**Validation:** Reviewed the notebook cells for input path discovery, label selection, feature exclusions, chronological split, preprocessing, classifier, and evaluation metrics. The notebook was not executed.
+
+**Implementation judgment and reason:** Used a chronological holdout to evaluate on later flights. Excluded `WeatherDelay` and actual `DepTime` as features; documented that same-hour weather is matched to actual departure and makes the exercise retrospective rather than a pre-departure forecast.
+
+## 47. Correct target and use stratified random train/test split
+
+**Prompt (verbatim):**
+
+> the label is DepDel15 not DepDelay15 its was my type, also don't split train and test set by specific months use scikit-learn X_train, X_test, y_train, y_test = train_test_split(
+>     X,
+>     y,
+>     test_size=0.2,
+>     random_state=42,
+>     stratify=y
+> ) to have good proportions of delayed and non delayed flight while keeping the separation fairly random rather than by months. Y is the the DepDelay15. Also, we want to train the model before doing any cleanly or anything so simply predict on the integrated parquet and nothing else
+
+**What the LLM produced:** Revised `notebooks/flight_delay_classification.ipynb` to require `DepDel15`, load features only from the stage 11 integrated Parquet, and use the requested scikit-learn stratified 80/20 random split with `random_state=42`. Removed month-based splitting, date-derived features, imputation, categorical encoding, and the earlier preprocessing pipeline. The numeric `HistGradientBoostingClassifier` handles missing feature values as-is. Updated the README description.
+
+**Validation:** Parsed notebook JSON and inspected the notebook cells, README, and diff for the exact target, requested split arguments, integrated Parquet path, and removal of month-based logic. Did not execute the notebook or train the model.
+
+**Implementation judgment and reason:** Treated `DepDel15` in the prompt's correction as the intended target name. Kept only numeric columns that exist in the integrated file, excluding target and outcome fields from predictors. Rows without a valid binary target are omitted because supervised fitting requires labels; feature values are not imputed or otherwise cleaned.
+
+## 48. Use every integrated column as a predictor
+
+**Prompt (verbatim):**
+
+> for now I don't want candidate feature I want to use all the features so the whoel 34 columns
+
+**What the LLM produced:** Changed the notebook to set the predictors to every integrated Parquet column except `DepDel15`, which is the target. Date columns are parsed to numeric timestamps, categorical columns are one-hot encoded, and numeric missing values remain unfilled. Updated README and cleared prior notebook outputs so stale execution results are not shown.
+
+**Validation:** Parsed the notebook JSON and checked that `FEATURES` is derived from all schema columns except the target, the stratified split remains unchanged, and prior outputs are cleared. Did not train the model.
+
+**Implementation judgment and reason:** Interpreted “all 34 columns” as all columns available for prediction while reserving the target column for `y`; the target cannot also be an input. Categorical inputs require encoding for scikit-learn's classifier to consume them.
+
+## 49. Use a neural network classifier
+
+**Prompt (verbatim):**
+
+> use a neural network instead
+
+**What the LLM produced:** Replaced the gradient-boosting classifier with scikit-learn's `MLPClassifier` neural network. Kept all integrated columns except `DepDel15` as predictors, the `DepDel15` target, stratified random 80/20 split, and the evaluation metrics. Added a training-only preprocessing pipeline for numeric imputation/scaling and categorical imputation/one-hot encoding. Cleared prior notebook outputs.
+
+**Validation:** Parsed the notebook JSON and inspected the neural-network and preprocessing cells, target, feature selection, and split. Did not run the training.
+
+**Implementation judgment and reason:** Used a multilayer perceptron available in the existing scikit-learn dependency. Neural networks require numeric inputs, so categorical encoding and numeric scaling/imputation are fit as part of a pipeline on the training data only.
+
+## 50. Tune the classification threshold
+
+**Prompt (verbatim):**
+
+> do the threshold tuning
+
+**What the LLM produced:** Updated the notebook to reserve a stratified validation subset from the training data, select the probability threshold that maximizes validation F1, refit the neural network on the full training split, and evaluate the selected threshold on the untouched test split. Updated the README and cleared notebook outputs.
+
+**Validation:** Parsed the notebook JSON and checked the validation split, F1 threshold selection, full-train refit, test evaluation and clean outputs. Did not execute training.
+
+**Implementation judgment and reason:** Maximizing F1 balances precision and recall as a starting point for the user's concern about missed delayed flights. The test split remains out of threshold selection to keep evaluation independent.
