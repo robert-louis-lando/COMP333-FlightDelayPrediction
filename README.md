@@ -186,12 +186,44 @@ flights whose origin is one of those airports, and
 matching airport records. Destination airports are not used for this filter.
 Use `--force` to rebuild both outputs.
 
+## 10. Find the nearest weather station for each top-ten airport
+
+Run:
+
+```powershell
+python scripts/06_analyze/airport_weather_station_distances.py
+```
+
+This calculates Haversine distance in kilometers from each of the 10 selected
+airports to every station with a valid ID and coordinates. It writes all pairs
+to `data/staging/06_analysis/airport_weather_station_distances.parquet` and
+the three nearest station candidates for each airport (30 rows) to
+`data/staging/06_analysis/airports_closest_weather_station.parquet`, ranked by
+distance in `DISTANCE_RANK`. Use
+`--force` to rebuild both outputs or `--batch-size 25000` for smaller batches.
+
+## 11. Download observations for the closest weather stations
+
+Run:
+
+```powershell
+python scripts/08_download/download_weather_observations.py
+```
+
+This reads the 30-row candidate table and tries stations in distance order for
+each airport. If NOAA returns 404 for a station, it tries the next candidate;
+it stops for that airport after finding an available 2024 GHCNh PSV file.
+Station files are downloaded at most once per run and reused across airports.
+Files are saved to `data/raw/noaa/observations/`. Existing files are reused;
+add `--force` to download them again. The pipeline runs this after creating the
+ranked candidate table.
+
 ## Pipeline folder layout
 
-Scripts are grouped in run order under `scripts/01_download/` through
-`scripts/07_subset/`. Parquet outputs are grouped by stage under
+Scripts are grouped by stage under `scripts/01_download/` through
+`scripts/08_download/`. Parquet outputs are grouped by stage under
 `data/staging/01_converted/`, `02_combined/`, `03_filtered/`, `04_reduced/`,
-and `05_top10/`. Source data remains under `data/raw/bts/` and
+`05_top10/`, and `06_analysis/`. Source data remains under `data/raw/bts/` and
 `data/raw/noaa/stations/`.
 The earlier WeatherDelay-filter output is preserved in
 `data/archive/previous_outputs/`; it is not an input to the current pipeline.

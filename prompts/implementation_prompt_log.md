@@ -649,3 +649,39 @@ batch-written output schema and row-count checks. The script was not run.
 **Implementation judgment and reason:** Read the station inventory Parquet
 directly, without inserting a combine/filter step, and wrote a separate output
 so the full inventory remains available.
+
+## 35. Calculate airport-to-weather-station distances
+
+**Prompt (verbatim):**
+
+> in the analyse add a script that will perform haversine distance between the 10 airports and the weather stations, you can make this a new parquet which is a joining table Airport-WeatherSation which would contain the AirportSEQID, the weather station id and the haversine distance between the 2. I would then make another parquet with only the closest weather station for each airport meaning 10 rows in this joining relation.
+
+**What the LLM produced:** Added `scripts/06_analyze/airport_weather_station_distances.py`. It writes an all-pairs Haversine distance table and a second 10-row table with the closest station per airport. Added the distance step to the pipeline runner and documented both outputs in the README.
+
+**Validation:** Reviewed input paths, output schema, station coordinate handling, Haversine calculation, batching, and output row-count checks. The script was not run.
+
+**Implementation judgment and reason:** Station rows are read in batches so the full pair table can be written without holding all pair distances in memory. Stations with missing or invalid IDs or coordinates are skipped because they cannot form a usable join or distance.
+
+## 36. Download weather observations for the closest stations
+
+**Prompt (verbatim):**
+
+> now I want to have a download the weather observation dataset, but only for those 10 closest weather stations, so add a step 08 to the pipeline which downloads the weather observation dataset
+
+**What the LLM produced:** Added `scripts/08_download/download_weather_observations.py` to read the closest-station Parquet and download each unique station's 2024 NOAA GHCNh PSV observations. Added the downloader to the full pipeline and documented its command, output folder, and `--force` option in the README. The next prompt updated this to ranked fallback candidates.
+
+**Validation:** Reviewed the old repository's NOAA endpoint, script input/output paths, station selection, download integrity checks, and pipeline dependency order. Downloads were not run.
+
+**Implementation judgment and reason:** Used 2024 to align observations with the project's 2024 flights. Deduplicated station IDs so a station nearest to multiple airports is downloaded only once. Kept the original PSV files unchanged for later cleaning/integration.
+
+## 37. Keep three ranked stations per airport and fall back on 404
+
+**Prompt (verbatim):**
+
+> for the parquet which has the 10 rows in the linking table could we keep the top 3 shortest distance between airport and weather for each weather stations making it 30 rows in the parquet, also when we download the weather observations in 08 we might get a 404 for that weather observation since the station might not have data so then we will go to the next in priority still keeping only 1 weather observation file fetched per weather station
+
+**What the LLM produced:** Updated the candidate Parquet to contain three stations per airport (30 rows), ranked by distance with `DISTANCE_RANK`. Updated the step 08 downloader to try ranks in order, skip 404 stations, and reuse successful downloads so each station file is fetched at most once per run.
+
+**Validation:** Reviewed the candidate ranking and row-count logic, priority ordering, 404-only fallback, cached station results, and documentation. Downloads were not run.
+
+**Implementation judgment and reason:** A station may be nearest to multiple airports, so the downloader shares one successfully fetched local station file among them. Each airport uses its first available candidate; a non-404 download failure stops the script instead of silently selecting a more distant station.

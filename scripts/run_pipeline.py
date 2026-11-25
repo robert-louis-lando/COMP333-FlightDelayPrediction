@@ -20,6 +20,8 @@ STEPS = (
     ("Reduce station columns", "scripts/05_reduce/reduce_station_columns.py", True),
     ("Print top ten origin airports", "scripts/06_analyze/top_origin_airports.py", False),
     ("Create top-ten airport/flight subsets", "scripts/07_subset/keep_top10_origin_airports.py", True),
+    ("Calculate airport-to-station distances", "scripts/06_analyze/airport_weather_station_distances.py", True),
+    ("Download observations for nearest weather stations", "scripts/08_download/download_weather_observations.py", True),
 )
 
 
