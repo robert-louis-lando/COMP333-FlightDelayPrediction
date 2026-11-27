@@ -20,6 +20,8 @@ the ZIPs and rebuild all derived Parquets.
 
 ## 1. Download the source ZIPs
 
+See [Pipeline data sources](data/README.md) for the original download links and local destinations.
+
 From the project root, run:
 
 ```powershell
