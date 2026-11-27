@@ -1,0 +1,7 @@
+Status: Prediction batches saved through FNL10000. Verified the exact output header, FNL00001 on line 2, and FNL10000 on line 10001 at the end of the file.
+Model ID: Not available in this session.
+Run date: Not available in this session.
+Input filename: features.csv
+Classification cutoff: 0.50 (inclusive).
+Full 10,000-row verification: Pending. The endpoint checks do not verify every ID, probability, or class. The available record also does not establish that every feature row in earlier batches was reviewed.
+Predictions were not scored.

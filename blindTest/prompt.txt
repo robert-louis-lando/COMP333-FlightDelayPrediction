@@ -1,0 +1,12 @@
+Run a blind prediction test on features.csv. For each of the 10,000 flights, estimate the probability that it departs at least 15 minutes after its scheduled departure, regardless of cause (BTS DepDel15).
+
+Use only the supplied schedule and weather features at the one-hour-before-departure cutoff. Treat blank weather fields as missing, not zero. Do not browse, look up flights, inspect unrelated files, or seek actual outcomes. Make your own estimates; do not fit a model or use a scripted scoring rule.
+
+Save llm_final_dep_delay_predictions.csv with exactly this header:
+flight_id,prob_dep_delay_ge_15,predicted_dep_delay_ge_15
+
+Process about 100 flights at a time and save each batch before reading the next. Keep the input IDs and order unchanged. Write one probability between 0 and 1 for every flight, including uncertain cases. Set predicted_dep_delay_ge_15 to 1 if the probability written in the CSV is at least 0.50, and to 0 otherwise. This is your predicted class, not the actual outcome. Do not modify the input.
+
+If resuming a partial run, verify the saved predictions form a contiguous prefix of the input. Continue from the next ID without changing earlier predictions. If you cannot finish, report the last saved ID rather than claiming completion.
+
+Verify that FNL00001 through FNL10000 each appear exactly once, all probabilities are valid, and all predicted classes are 0 or 1 and match the 0.50 cutoff. Record the model ID if known, run date, input filename, and classification cutoff (0.50) in final_run_notes.txt. Do not score the predictions.
