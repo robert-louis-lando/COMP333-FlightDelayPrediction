@@ -25,7 +25,7 @@ display(flights.head())
 ```
 
 **How I validated it**  
-I confirmed the path printed by the load step, checked that the table had the expected 1,929,930-by-34 shape, and looked at the first records. The preview showed flight and target fields alongside airport details and weather measurements.
+I asked GPT-Sol if it made sense.
 
 **What changed based on my own judgment**  
 I chose to consume the combined dataset as an input rather than redo the source joins here. That kept this analysis centered on classification and avoided adding a second integration implementation.
@@ -75,6 +75,10 @@ data_cleaned = (
 For the transformed approach, extract calendar features and define a preprocessing step:
 
 ```python
+data_transformed = flights.drop(
+    columns=["WeatherDelay", "wind_gust", "wet_bulb_temperature"]
+).copy()
+
 for column in date_columns:
     parsed = pd.to_datetime(data_transformed[column], errors="coerce")
     data_transformed[f"{column}_month"] = parsed.dt.month
@@ -82,16 +86,28 @@ for column in date_columns:
     data_transformed[f"{column}_day_of_week"] = parsed.dt.dayofweek
 
 data_transformed = data_transformed.drop(columns=date_columns)
+calendar_columns = [
+    f"{column}_{part}"
+    for column in date_columns
+    for part in ("month", "day", "day_of_week")
+]
+categorical_features = categorical_columns + calendar_columns
+numeric_features = [column for column in numerical_columns if column != "DepDel15"]
 
 preprocessor = ColumnTransformer(
     transformers=[
-        ("numeric", StandardScaler(), numerical_columns),
+        ("numeric", StandardScaler(), numeric_features),
         ("categorical", OneHotEncoder(handle_unknown="ignore", sparse_output=False),
-         categorical_columns),
+         categorical_features),
     ],
     remainder="drop",
 )
 
+X = data_transformed.drop(columns=["DepDel15"])
+y = data_transformed["DepDel15"]
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
 X_train_prepared = preprocessor.fit_transform(X_train)
 X_test_prepared = preprocessor.transform(X_test)
 ```
@@ -100,7 +116,7 @@ For the reduced feature set, drop the descriptive, location, station, and observ
 
 ```python
 columns_to_remove = [
-    "OriginCityName", "OriginStateName", "DestCityName", "DestStateName",
+    "WeatherDelay", "OriginCityName", "OriginStateName", "DestCityName", "DestStateName",
     "AirportCountryName", "AirportStateName", "AirportCityName",
     "AirportLatitude", "AirportLongitude", "AirportUTCOffset",
     "WeatherStationID", "AirportWeatherStationDistanceKm",
@@ -112,16 +128,7 @@ data_extracted = flights.drop(columns=columns_to_remove).copy()
 ```
 
 **How I validated it**  
-I inspected the processed samples and compared each version using binary and macro F1 on the held-out data:
-
-| Version | Binary F1 | Macro F1 |
-|---|---:|---:|
-| Raw | 0.1967 | 0.4986 |
-| Cleaned | 0.2095 | 0.5253 |
-| Transformed | 0.2299 | 0.5255 |
-| Feature-selected | 0.2214 | 0.5091 |
-
-The transformed version had the strongest saved binary F1. The feature-selected version did not improve on it.
+I asked GPT-Sol if it made sense.
 
 **What changed based on my own judgment**  
 I removed `WeatherDelay` to avoid leaking information about the outcome. I tested different missing-value strategies, removed two weather columns, added scaled numeric and calendar features, and manually reduced descriptive fields. I kept the comparison results in view instead of presuming that fewer features would yield a better model.
@@ -170,7 +177,7 @@ for features, labels in train_loader:
 ```
 
 **How I validated it**  
-I checked that the recorded training loss generally fell over the 20 displayed epochs. I then compared the models using held-out binary and macro F1, since decreasing training loss alone does not establish useful classification performance.
+I checked pytorch scikit-learn documentation.
 
 **What changed based on my own judgment**  
 I kept the network and optimizer setup consistent across the experiments so that the input preparation was the main comparison. I retained class weighting for the imbalanced target and judged results with both binary and macro F1.
@@ -208,7 +215,7 @@ macro_f1 = f1_score(actual, predicted, average="macro")
 ```
 
 **How I validated it**  
-I compared the held-out scores across variants. The transformed data had the highest binary F1 (**0.2299**, compared with **0.1967** for raw data) and macro F1 of **0.5255**. The reduced feature set scored **0.2214** binary F1 and **0.5091** macro F1. These values describe this split, not performance on every future sample.
+I compare with GPT-Sol.
 
 **What changed based on my own judgment**  
 I kept the split stratified and reproducible, and considered both F1 scores when comparing models. I did not favor the smaller feature set simply for being simpler because its scores were lower than the transformed model's. I treated this as an initial evaluation; the workflow uses one holdout split and a fixed threshold, without cross-validation or a separate final test set.
