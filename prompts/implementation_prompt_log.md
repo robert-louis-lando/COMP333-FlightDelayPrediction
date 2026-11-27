@@ -291,7 +291,7 @@ and `LONGITUDE` from the converted station inventory and write
 `data/staging/04_reduced/ghcnh_stations_reduced.parquet`. Added the reducer to
 the pipeline runner and README.
 
-**Human validation:** Reviewed the input path, requested column names/order, and
+**Human validation:** Reviewed the input path, requested column names/order
 
 **Human judgment and reason:** Reduced the columns to what is relevant and all we need is coordinates for location and id to know which weather observation is tied to the station.
 
@@ -340,7 +340,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Added `scripts/06_analyze/airport_weather_station_distances.py`. It writes an all-pairs Haversine distance table and a second 10-row table with the closest station per airport. Added the distance step to the pipeline runner and documented both outputs in the README.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** The reason behind this decision is that we needed to match our 10 airports to a weather station. We decided to use the haversine algorithm to calculate the distance between airport and weather station. Make a linking table which would contain airport + closest weather station and its distance.
 
@@ -354,7 +354,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Added `scripts/08_download/download_weather_observations.py` to read the closest-station Parquet and download each unique station's 2024 NOAA GHCNh PSV observations. Added the downloader to the full pipeline and documented its command, output folder, and `--force` option in the README. The next prompt updated this to ranked fallback candidates.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** Need to download the weather observation data based on the "selected" weather station from our linking table.
 
@@ -366,7 +366,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Updated the candidate Parquet to contain three stations per airport (30 rows), ranked by distance with `DISTANCE_RANK`. Updated the step 08 downloader to try ranks in order, skip 404 stations, and reuse successful downloads so each station file is fetched at most once per run.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** A station may be nearest to multiple airports, so the downloader shares one successfully fetched local station file among them. Each airport uses its first available candidate.
 
@@ -380,7 +380,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Added `scripts/09_combine/combine_weather_observations.py` to convert the downloaded 2024 station PSV files and append their rows into `data/staging/07_weather/weather_observations_2024.parquet`. Added this as the next step in the pipeline and documented its command and output.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** Converting for convenience and also did it for all the other datasets.
 
@@ -394,7 +394,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Added `scripts/10_reduce/reduce_weather_observation_columns.py` to write `data/staging/07_weather/weather_observations_2024_reduced.parquet` with only the 11 requested columns. Added the reducer as the final pipeline step and documented its command and output in README.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** Reducing the weather observation table to only the relevant columns for model training.
 
@@ -408,7 +408,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Added `scripts/11_integrate/integrate_flight_weather.py` to join the latest top-ten flights and airports, ranked airport-station links, reduced station inventory, and reduced observations into `data/staging/08_integrated/flights_airports_weather_2024.parquet`. Added it to the pipeline and documented its inputs and output.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** Want to "integrate" which really means just join all the tables into one big table so we can then train on the data.
 
@@ -420,7 +420,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Changed the flight-to-weather join in stage 11 to a left join and stopped filtering out flights with missing or invalid departure join keys. Weather observation fields remain null when there is no same-hour match. Added a check that integrated row count equals the flight input row count and updated the README.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** Preserve all flight rows as requested while retaining null weather values when the selected station has no observation for that flight's local departure hour.
 
@@ -434,7 +434,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Revised `notebooks/flight_delay_classification.ipynb` to require `DepDel15`, load features only from the stage 11 integrated Parquet, and use the requested scikit-learn stratified 80/20 random split with `random_state=42`. Removed month-based splitting, date-derived features, imputation, categorical encoding, and the earlier preprocessing pipeline. The numeric `HistGradientBoostingClassifier` handles missing feature values as-is. Updated the README description.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** It was splitting the dataset into train(first 10months) and test (last 2 months), this could skew the distributions and isn't random at all.
 
@@ -446,7 +446,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Replaced the gradient-boosting classifier with scikit-learn's `MLPClassifier` neural network. Kept all integrated columns except `DepDel15` as predictors, the `DepDel15` target, stratified random 80/20 split, and the evaluation metrics. Added a training-only preprocessing pipeline for numeric imputation/scaling and categorical imputation/one-hot encoding. Cleared prior notebook outputs.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior
 
 **Human judgment and reason:** Tested with a HistGradientBoostingClassifier, but the result were really lacking. So decided to try a neural network.
 
@@ -458,7 +458,7 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Updated the notebook to reserve a stratified validation subset from the training data, select the probability threshold that maximizes validation F1, refit the neural network on the full training split, and evaluate the selected threshold on the untouched test split. Updated the README and cleared notebook outputs.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** Maximizing F1 balances precision and recall as a starting point for the user's concern about missed delayed flights. The test split remains out of threshold selection to keep evaluation independent.
 
@@ -470,6 +470,6 @@ that flight rows are filtered by origin only, and that output row counts are
 
 **What the LLM produced:** Added random undersampling after the stratified train/test split to make `X_train` and `y_train` 50/50 delayed and non-delayed. Left `X_test` and `y_test` unchanged, so test proportions remain the original stratified proportions. Updated the README and cleared notebook outputs.
 
-**Human validation:** Reviewed the implementation and its documented behavior against the request.
+**Human validation:** Reviewed the implementation and its documented behavior.
 
 **Human judgment and reason:** Used undersampling to make training 50/50 without synthesizing or duplicating examples. This discards some non-delayed training rows but preserves the full, naturally distributed test split for evaluation.
