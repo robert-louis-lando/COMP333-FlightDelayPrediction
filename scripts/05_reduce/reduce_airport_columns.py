@@ -12,11 +12,13 @@ INPUT = ROOT / "data/staging/03_filtered/airports_active_2024.parquet"
 OUTPUT = ROOT / "data/staging/04_reduced/airports_active_2024_reduced.parquet"
 COLUMNS = (
     "AIRPORT_SEQ_ID",
+    "AIRPORT_COUNTRY_NAME",
     "AIRPORT_STATE_NAME",
     "DISPLAY_AIRPORT_NAME",
     "DISPLAY_AIRPORT_CITY_NAME_FULL",
     "LATITUDE",
     "LONGITUDE",
+    "UTC_LOCAL_TIME_VARIATION",
 )
 
 

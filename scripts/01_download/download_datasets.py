@@ -1,8 +1,9 @@
-"""Download only the BTS airport reference and all 12 monthly 2024 flight ZIPs."""
+"""Download BTS airport/flights ZIPs and the NOAA GHCN station inventory."""
 
 from __future__ import annotations
 
 import argparse
+import csv
 import http.cookiejar
 import html
 import os
@@ -21,6 +22,10 @@ AIRPORT_FORM = (
 )
 FLIGHT_URL = "https://www.transtats.bts.gov/PREZIP/"
 FLIGHT_FILE = "On_Time_Marketing_Carrier_On_Time_Performance_Beginning_January_2018_2024_{}.zip"
+NOAA_STATIONS_URL = (
+    "https://www.ncei.noaa.gov/oa/global-historical-climatology-network/hourly/doc/"
+)
+STATION_FILES = ("ghcnh-station-list.csv", "ghcnh-station-list.txt")
 
 
 def make_client() -> urllib.request.OpenerDirector:
@@ -62,10 +67,53 @@ def download_zip(
             partial.unlink()
 
 
+def download_station_file(
+    client: urllib.request.OpenerDirector,
+    filename: str,
+    force: bool,
+) -> None:
+    """Download one NOAA station inventory file without extracting or processing it."""
+    relative = Path("data/raw/noaa/stations") / filename
+    path = ROOT / relative
+    if path.is_file() and not force:
+        print(f"Already downloaded: {relative}")
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + ".part")
+    try:
+        print(f"Downloading: {filename}")
+        with client.open(NOAA_STATIONS_URL + filename, timeout=120) as response:
+            if "text/html" in response.headers.get("Content-Type", ""):
+                raise ValueError(f"NOAA returned a web page instead of {filename}")
+            expected = response.headers.get("Content-Length")
+            with partial.open("wb") as output:
+                shutil.copyfileobj(response, output)
+
+        if not partial.stat().st_size or (
+            expected is not None and partial.stat().st_size != int(expected)
+        ):
+            raise ValueError(f"Incomplete NOAA download: {filename}")
+        if path.suffix.lower() == ".csv":
+            with partial.open(encoding="utf-8-sig", newline="") as source:
+                header = next(csv.reader(source), [])
+            if len(header) < 2:
+                raise ValueError("NOAA station CSV did not contain an expected header row")
+
+        os.replace(partial, path)
+        print(f"Saved: {relative} ({path.stat().st_size:,} bytes)")
+    finally:
+        if partial.exists():
+            partial.unlink()
+
+
 def airport_download_request(client: urllib.request.OpenerDirector) -> urllib.request.Request:
     """Select all fields on the BTS Master Coordinate download form."""
     with client.open(AIRPORT_FORM, timeout=120) as response:
         page = response.read().decode("utf-8")
+
+    if "system maintenance" in page.lower() or "maintenance.aspx?reason=db" in page.lower():
+        raise RuntimeError("BTS TranStats is currently serving its system-maintenance page")
 
     hidden = {
         name: html.unescape(value)
@@ -90,24 +138,56 @@ def airport_download_request(client: urllib.request.OpenerDirector) -> urllib.re
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--force", action="store_true", help="download again over existing ZIP files")
+    parser.add_argument("--force", action="store_true", help="redownload the selected files")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--flights-only", action="store_true", help="download only the 12 flight ZIPs")
+    selection.add_argument("--airports-only", action="store_true", help="download only the airport ZIP")
+    selection.add_argument("--stations-only", action="store_true", help="download only the NOAA station inventory")
     args = parser.parse_args()
     client = make_client()
 
-    print("Step 1/2: download the 12 monthly flight ZIPs (Jan-Dec 2024).")
-    flights_dir = ROOT / "data/raw/bts/flights"
-    for month in range(1, 13):
-        filename = FLIGHT_FILE.format(month)
-        download_zip(client, FLIGHT_URL + filename, flights_dir / filename, args.force)
+    download_all = not (args.flights_only or args.airports_only or args.stations_only)
+    if download_all or args.flights_only:
+        print("Downloading the 12 monthly flight ZIPs (Jan-Dec 2024).")
+        flights_dir = ROOT / "data/raw/bts/flights"
+        for month in range(1, 13):
+            filename = FLIGHT_FILE.format(month)
+            download_zip(client, FLIGHT_URL + filename, flights_dir / filename, args.force)
 
-    print("Step 2/2: download the complete BTS Master Coordinate airport ZIP.")
-    airport_path = ROOT / "data/raw/bts/airports/T_MASTER_CORD.zip"
-    if airport_path.is_file() and not args.force:
-        print(f"Already downloaded: {airport_path.relative_to(ROOT)}")
-    else:
-        download_zip(client, airport_download_request(client), airport_path, args.force)
+    if download_all or args.airports_only:
+        print("Downloading the complete BTS Master Coordinate airport ZIP.")
+        airport_path = ROOT / "data/raw/bts/airports/T_MASTER_CORD.zip"
+        if airport_path.is_file() and not args.force:
+            print(f"Already downloaded: {airport_path.relative_to(ROOT)}")
+        else:
+            try:
+                request = airport_download_request(client)
+            except RuntimeError as exc:
+                try:
+                    with zipfile.ZipFile(airport_path) as archive:
+                        valid_archive = (
+                            "T_MASTER_CORD.csv" in archive.namelist()
+                            and archive.testzip() is None
+                        )
+                except (OSError, zipfile.BadZipFile):
+                    valid_archive = False
+                if not valid_archive:
+                    raise RuntimeError(
+                        f"{exc}. No valid cached airport ZIP is available; retry when BTS is back."
+                    ) from exc
+                print(
+                    f"BTS airport download unavailable ({exc}); using validated cached "
+                    f"{airport_path.relative_to(ROOT)} instead."
+                )
+            else:
+                download_zip(client, request, airport_path, args.force)
 
-    print("Done. ZIP files are saved under data/raw/bts/.")
+    if download_all or args.stations_only:
+        print("Downloading the NOAA GHCN hourly weather-station inventory.")
+        for filename in STATION_FILES:
+            download_station_file(client, filename, args.force)
+
+    print("Download selection complete.")
 
 
 if __name__ == "__main__":

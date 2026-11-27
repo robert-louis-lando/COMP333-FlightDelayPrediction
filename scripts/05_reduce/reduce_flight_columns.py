@@ -12,6 +12,7 @@ INPUT = ROOT / "data/staging/03_filtered/flights_2024_weather_delay_rule.parquet
 OUTPUT = ROOT / "data/staging/04_reduced/flights_2024_reduced.parquet"
 COLUMNS = (
     "FlightDate",
+    "DepTime",
     "OriginAirportSeqID",
     "OriginCityName",
     "OriginStateName",
